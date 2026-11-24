@@ -26,7 +26,8 @@ func proxyOutboundTCP(ctx context.Context, conn net.Conn, destination M.Socksadd
 		return err
 	}
 
-	return bufio.CopyConn(ctx, conn, c)
+	_, _, relayErr := proxy.Relay(conn, c)
+	return relayErr
 }
 
 func proxyOutboundUoT(ctx context.Context, conn net.Conn, destination M.Socksaddr) error {

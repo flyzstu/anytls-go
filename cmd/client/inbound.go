@@ -6,6 +6,7 @@ import (
 	"net"
 	"runtime/debug"
 
+	"anytls/proxy"
 	"github.com/sagernet/sing/common/bufio"
 	M "github.com/sagernet/sing/common/metadata"
 	"github.com/sagernet/sing/common/network"
@@ -54,7 +55,8 @@ func (c *myClient) NewConnection(ctx context.Context, conn net.Conn, metadata M.
 	}
 	defer proxyC.Close()
 
-	return bufio.CopyConn(ctx, conn, proxyC)
+	_, _, err = proxy.Relay(conn, proxyC)
+	return err
 }
 
 func (c *myClient) NewPacketConnection(ctx context.Context, conn network.PacketConn, metadata M.Metadata) error {

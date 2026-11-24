@@ -21,6 +21,8 @@ func main() {
 	listen := flag.String("l", "0.0.0.0:8443", "server listen port")
 	password := flag.String("p", "", "password")
 	paddingScheme := flag.String("padding-scheme", "", "padding-scheme")
+	heartbeatInterval := flag.Duration("heartbeat-interval", 30*time.Second, "idle session keepalive probe interval, 0 disables it")
+	heartbeatTimeout := flag.Duration("heartbeat-timeout", 30*time.Second, "close a session that answers nothing for this long")
 	flag.Parse()
 
 	if *password == "" {
@@ -68,7 +70,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	server := NewMyServer(tlsConfig)
+	server := NewMyServer(tlsConfig, *heartbeatInterval, *heartbeatTimeout)
 
 	for {
 		c, err := listener.Accept()

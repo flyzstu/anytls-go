@@ -3,8 +3,8 @@ package main
 import (
 	"anytls/proxy/padding"
 	"anytls/proxy/session"
-	"bytes"
 	"context"
+	"crypto/subtle"
 	"crypto/tls"
 	"encoding/binary"
 	"net"
@@ -38,7 +38,7 @@ func handleTcpConnection(ctx context.Context, c net.Conn, s *myServer) {
 	c = bufio.NewCachedConn(c, b)
 
 	by, err := b.ReadBytes(32)
-	if err != nil || !bytes.Equal(by, passwordSha256) {
+	if err != nil || subtle.ConstantTimeCompare(by, passwordSha256) != 1 {
 		b.Resize(0, n)
 		fallback(ctx, c)
 		return
@@ -79,6 +79,9 @@ func handleTcpConnection(ctx context.Context, c net.Conn, s *myServer) {
 			proxyOutboundTCP(ctx, stream, destination)
 		}
 	}, &padding.DefaultPaddingFactory)
+	if s.heartbeatInterval > 0 {
+		session.SetHeartbeat(s.heartbeatInterval, s.heartbeatTimeout)
+	}
 	session.Run()
 	session.Close()
 }

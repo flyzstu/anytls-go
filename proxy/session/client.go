@@ -94,19 +94,10 @@ func (c *Client) CreateStream(ctx context.Context) (net.Conn, error) {
 	if session == nil {
 		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
-	stream, err = session.OpenStream()
-	if err != nil {
-		session.Close()
-		return nil, fmt.Errorf("failed to create stream: %w", err)
-	}
 
-	if clientDebugSessionPool {
-		cn := clientStreamCounter.Add(1)
-		s := c.sessionCounter.Load()
-		logrus.Infoln("cumulative session:", s, "cumulative stream:", cn, "avg:", float64(cn)/float64(s))
-	}
-
-	stream.dieHook = func() {
+	// The hook must exist before the SYN is written: the peer can answer with
+	// FIN immediately, and a late hook would leak the session from the pool.
+	hook := func() {
 		// If Session is not closed, put this Stream to pool
 		if !session.IsClosed() {
 			if c.disableReuse {
@@ -115,7 +106,7 @@ func (c *Client) CreateStream(ctx context.Context) (net.Conn, error) {
 			}
 
 			if clientDebugSessionPool {
-				logrus.Infoln("put session:", session.seq, stream.id)
+				logrus.Infoln("put session:", session.seq)
 			}
 			select {
 			case <-c.die.Done():
@@ -129,9 +120,21 @@ func (c *Client) CreateStream(ctx context.Context) (net.Conn, error) {
 			}
 		} else {
 			if clientDebugSessionPool {
-				logrus.Infoln("discard session stream:", session.seq, stream.id)
+				logrus.Infoln("discard session stream:", session.seq)
 			}
 		}
+	}
+
+	stream, err = session.openStream(hook)
+	if err != nil {
+		session.Close()
+		return nil, fmt.Errorf("failed to create stream: %w", err)
+	}
+
+	if clientDebugSessionPool {
+		cn := clientStreamCounter.Add(1)
+		s := c.sessionCounter.Load()
+		logrus.Infoln("cumulative session:", s, "cumulative stream:", cn, "avg:", float64(cn)/float64(s))
 	}
 
 	return stream, nil
